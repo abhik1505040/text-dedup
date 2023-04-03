@@ -138,7 +138,7 @@ def embed_func(
     initial_tokens = NON_ALPHA.split(content) if remove_non_alpha else content.split()
     if TOKENIZER is not None:
         initial_tokens = TOKENIZER.tokenize(content.strip())
-        
+
     a, b = permutations
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
     tokens: Set[str] = {" ".join(t) for t in ngrams(initial_tokens, ngram_size, min_length)}
@@ -335,7 +335,7 @@ if __name__ == "__main__":  # pragma: no cover
                 debug_path = os.path.join(args.output, "cluster_documents.txt")
 
                 with open(debug_path, 'w') as outf:
-                    for indices in cluster2idx.values():
+                    for indices in tqdm(cluster2idx.values(), dynamic_ncols=True, desc="Writing debug file...") :
                         if len(indices) == 1: continue
                         cluster_ds = ds.select(indices)
                         for doc in cluster_ds[args.column]:
