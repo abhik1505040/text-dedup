@@ -23,6 +23,7 @@ import datasets
 import numpy as np
 from datasets import load_dataset
 from datasets import load_from_disk
+from transformers import AutoTokenizer
 from scipy.integrate import quad as integrate
 from tqdm import tqdm
 
@@ -39,6 +40,7 @@ RNG = np.random.RandomState(SEED)
 NON_ALPHA = re.compile("[^A-Za-z_0-9]")
 MAX_HASH = np.uint64((1 << 32) - 1)
 MERSENNE_PRIME = np.uint64((1 << 61) - 1)
+TOKENIZER = None
 datasets.logging.set_verbosity_error()
 
 
@@ -79,6 +81,7 @@ def embed_func(
     min_length: int,
     hashranges: List[Tuple[int, int]],
     permutations: np.ndarray,
+    remove_non_alpha: bool,
 ) -> Dict[str, Any]:
     """
     Calculate hash values for the content.
@@ -99,6 +102,8 @@ def embed_func(
         The ranges of hash values.
     permutations : np.ndarray
         The permutations for the minhash.
+    remove_non_alpha: bool
+        Whether to remove non alpha numeric tokens
 
     Returns
     -------
@@ -108,6 +113,7 @@ def embed_func(
     Examples
     --------
     >>> content = "hello world"
+    >>> remove_non_alpha = False
     >>> idx = 0
     >>> num_perm = 250
     >>> ngram_size = 1
@@ -122,15 +128,20 @@ def embed_func(
     ...     ],
     ...     dtype=np.uint64,
     ... ).T
-    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges, permutations=PERMUTATIONS)
+    >>> res = embed_func(content, idx, num_perm=num_perm, ngram_size=ngram_size, min_length=0, hashranges=hashranges, permutations=PERMUTATIONS, remove_non_alpha=remove_non_alpha)
     >>> len(res["__signatures__"])
     10
     >>> res["__id__"]
     0
     """
+    global TOKENIZER
+    initial_tokens = NON_ALPHA.split(content) if remove_non_alpha else content.split()
+    if TOKENIZER is not None:
+        initial_tokens = TOKENIZER.tokenize(content.strip())
+        
     a, b = permutations
     masks: np.ndarray = np.full(shape=num_perm, dtype=np.uint64, fill_value=MAX_HASH)
-    tokens: Set[str] = {" ".join(t) for t in ngrams(NON_ALPHA.split(content), ngram_size, min_length)}
+    tokens: Set[str] = {" ".join(t) for t in ngrams(initial_tokens, ngram_size, min_length)}
     hashvalues: np.ndarray = np.array([sha1_hash(token.encode("utf-8")) for token in tokens], dtype=np.uint64)
     permuted_hashvalues = np.bitwise_and(
         ((hashvalues * np.tile(a, (len(hashvalues), 1)).T).T + b) % MERSENNE_PRIME, MAX_HASH
@@ -223,6 +234,8 @@ if __name__ == "__main__":  # pragma: no cover
     mp.set_start_method("fork", force=True)
     uf = UnionFind()
     timer = Timer()
+    if args.tokenizer_name_or_path is not None:
+        TOKENIZER = AutoTokenizer.from_pretrained(args.tokenizer_name_or_path)
 
     if args.b is not None and args.r is not None:
         B, R = args.b, args.r
@@ -269,6 +282,7 @@ if __name__ == "__main__":  # pragma: no cover
                     "ngram_size": args.ngram,
                     "min_length": args.min_length,
                     "permutations": PERMUTATIONS,
+                    "remove_non_alpha": args.remove_non_alpha,
                 },
                 input_columns=[args.column],
                 remove_columns=ds.column_names,
@@ -308,6 +322,27 @@ if __name__ == "__main__":  # pragma: no cover
             )
             gc.enable()
             gc.collect()
+            
+            if args.debug:
+                # accumulate cluster mappings indepently from dataset.map()
+                # writing to a shared memory from multiple processes
+                # would be more expensive
+                cluster2idx = defaultdict(list)
+                for idx, cluster in enumerate(ds['__cluster__']):
+                    cluster2idx[cluster].append(idx)
+
+                os.makedirs(args.output, exist_ok=True)
+                debug_path = os.path.join(args.output, "cluster_documents.txt")
+
+                with open(debug_path, 'w') as outf:
+                    for indices in cluster2idx.values():
+                        if len(indices) == 1: continue
+                        cluster_ds = ds.select(indices)
+                        for doc in cluster_ds[args.column]:
+                            print(doc, file=outf)
+                        
+                        print('', file=outf)
+
             # This is where the deduplication happens
             # Since there is no easy groupby in datasets
             # I will use this simple filter for now

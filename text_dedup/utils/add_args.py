@@ -87,6 +87,12 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         help="Ngram size to use in MinHash.",
     )
     parser.add_argument(
+        "--tokenizer_name_or_path",
+        type=str,
+        default=None,
+        help="Use a HF compatible tokenizer to tokenize the text before deduplication"
+    )
+    parser.add_argument(
         "--min_length",
         type=int,
         default=5,
@@ -108,6 +114,9 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         type=int,
         default=None,
         help="Number of rows per band",
+    )
+    parser.add_argument(
+        "--remove_non_alpha", action=argparse.BooleanOptionalAction, help="Whether to remove non alphanumeric characters", default=False
     )
 
     return parser
