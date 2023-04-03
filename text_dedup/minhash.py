@@ -336,7 +336,7 @@ if __name__ == "__main__":  # pragma: no cover
 
                 with open(debug_path, 'w') as outf:
                     for indices in tqdm(cluster2idx.values(), dynamic_ncols=True, desc="Writing debug file...") :
-                        if len(indices) == 1: continue
+                        if len(indices) <= 1: continue
                         cluster_ds = ds.select(indices)
                         for doc in cluster_ds[args.column]:
                             print(doc, file=outf)
