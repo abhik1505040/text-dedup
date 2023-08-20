@@ -354,7 +354,12 @@ if __name__ == "__main__":  # pragma: no cover
 
         with timer("Saving"):
             final_data = final_data.remove_columns(["__cluster__"])
-            final_data.save_to_disk(args.output)
+            if not args.plain_text_output:
+                final_data.save_to_disk(args.output)
+            else:
+                with open(os.path.join(args.output, 'output_data.jsonl'), 'w') as f:
+                    for k in final_data: print(json.dumps(k, ensure_ascii=False), file=f)
+
             if args.debug:
                 with open(os.path.join(args.output, "uf.pkl"), "wb") as f:
                     pickle.dump(uf, f, protocol=pickle.HIGHEST_PROTOCOL)

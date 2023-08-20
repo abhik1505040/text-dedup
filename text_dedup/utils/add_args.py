@@ -118,6 +118,9 @@ def add_minhash_args(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     parser.add_argument(
         "--remove_non_alpha", action=argparse.BooleanOptionalAction, help="Whether to remove non alphanumeric characters", default=False
     )
+    parser.add_argument(
+        "--plain_text_output", action=argparse.BooleanOptionalAction, help="Whether to dump the output dataset in plain text", default=False
+    )
 
     return parser
 
