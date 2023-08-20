@@ -12,6 +12,7 @@ import os
 import pickle
 import random
 import re
+import json
 from collections import defaultdict
 from typing import Any
 from typing import Dict
@@ -332,17 +333,15 @@ if __name__ == "__main__":  # pragma: no cover
                     cluster2idx[cluster].append(idx)
 
                 os.makedirs(args.output, exist_ok=True)
-                debug_path = os.path.join(args.output, "cluster_documents.txt")
+                debug_path = os.path.join(args.output, "cluster_documents.jsonl")
 
                 with open(debug_path, 'w') as outf:
                     for indices in tqdm(cluster2idx.values(), dynamic_ncols=True, desc="Writing debug file...") :
                         if len(indices) <= 1: continue
                         cluster_ds = ds.select(indices)
-                        for doc in cluster_ds[args.column]:
-                            print(doc, file=outf)
+                        cluster_json = [k for k in cluster_ds]
+                        print(json.dumps(cluster_json, ensure_ascii=False), file=outf)
                         
-                        print('', file=outf)
-
             # This is where the deduplication happens
             # Since there is no easy groupby in datasets
             # I will use this simple filter for now
